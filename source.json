@@ -1,6 +1,6 @@
 {
-    "name":"Spout2VRC",
-    "id":"com.spout2vrc",
+    "name":"Spout2VRCEditor",
+    "id":"com.spout2vrceditor",
     "url":"https://u-kotovsky.github.io/vpm-listing/index.json",
     "description":"",
     "githubRepos": [
