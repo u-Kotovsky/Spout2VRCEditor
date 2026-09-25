@@ -3,7 +3,6 @@ using System;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
-using VRC.Udon;
 
 namespace Texel
 {
@@ -58,6 +57,22 @@ namespace Texel
             return newArr;
         }
 
+        public static Array ArraySetSize(Array arr, int size, Type type)
+        {
+            if (Utilities.IsValid(arr))
+            {
+                int count = arr.Length;
+                if (size == count)
+                    return arr;
+
+                Array newArr = Array.CreateInstance(type, size);
+                Array.Copy(arr, newArr, Mathf.Min(count, size));
+                return newArr;
+            }
+
+            return arr;
+        }
+
         public static Array ArrayMinSize(Array arr, int size, Type type)
         {
             if (Utilities.IsValid(arr))
@@ -74,6 +89,21 @@ namespace Texel
             return arr;
         }
 
+        public static Array ArrayMaxSize(Array arr, int size, Type type)
+        {
+            if (Utilities.IsValid(arr))
+            {
+                int count = arr.Length;
+                if (count > size)
+                {
+                    Array newArr = Array.CreateInstance(type, size);
+                    Array.Copy(arr, newArr, size);
+                    return newArr;
+                }
+            }
+
+            return arr;
+        }
         public static Array ArrayCompact(Array arr)
         {
             if (!Utilities.IsValid(arr))

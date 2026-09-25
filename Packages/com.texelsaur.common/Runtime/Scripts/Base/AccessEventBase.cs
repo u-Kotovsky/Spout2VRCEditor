@@ -1,48 +1,41 @@
 ﻿
-using Texel;
-using UdonSharp;
+using System.Runtime.CompilerServices;
 using UnityEngine;
+using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
-using VRC.Udon;
+using VRC.Udon.Common;
+
+[assembly: InternalsVisibleTo("com.texelsaur.common.Editor")]
+[assembly: InternalsVisibleTo("com.texelsaur.video.Editor")]
 
 namespace Texel
 {
-    public abstract class AccessEventBase : EventBase
+    public abstract class AccessEventBase : DebugEventBase
     {
-        [SerializeField] internal AccessControl accessControl;
+        [Header("Access Control")]
+        [SerializeField] protected internal AccessControl accessControl;
         [SerializeField] internal bool enforceOwnershipTransfer = true;
+        [SerializeField] internal bool reclaimOwnership = true;
+        [SerializeField] internal bool syncGateEnabled = false;
 
-        protected DebugLog accessDebugLog;
-        protected bool accessDebugLowLevel = false;
+        [SerializeField] protected internal bool includeAccessLogging;
 
-        protected string componentName = "Component";
+        protected bool hasAccessControl = false;
 
-        private bool isOwner = false;
+        private bool ae_reclaimQueued = false;
+        private bool ae_useAccessDebug = false;
+        private bool ae_bypassAccessCheck = false;
+        private bool ae_bypassOwnershipCheck = false;
+        private bool ae_shadowValid = false;
+        private int ae_logAccessChannel = -1;
 
-        protected override void _Init()
+        private VRCPlayerApi[] ae_playerScratch;
+
+        public void _SetAccessControl(AccessControl accessControl)
         {
-            base._Init();
+            this.accessControl = accessControl;
 
-            if (Networking.IsOwner(gameObject))
-                isOwner = true;
-        }
-
-        public override bool OnOwnershipRequest(VRCPlayerApi requestingPlayer, VRCPlayerApi requestedOwner)
-        {
-            if (!accessControl || !enforceOwnershipTransfer)
-                return true;
-
-            bool requesterCheck = accessControl._HasAccess(requestingPlayer) || Networking.IsOwner(requestingPlayer, gameObject);
-            bool requesteeCheck = accessControl._HasAccess(requestedOwner);
-
-            _AccessDebugLowLevel($"Ownership check: requester={requesterCheck}, requestee={requesteeCheck}");
-
-            return requesterCheck && requesteeCheck;
-        }
-
-        public string ComponentName
-        {
-            get { return componentName; }
+            _RefreshDebugFlags();
         }
 
         public string OwnerName
@@ -52,68 +45,229 @@ namespace Texel
                 VRCPlayerApi player = Networking.GetOwner(gameObject);
                 if (Utilities.IsValid(player))
                     return player.displayName;
+
                 return "[INVALID]";
             }
         }
 
-        public override void OnOwnershipTransferred(VRCPlayerApi player)
+        public bool AccessLogging
         {
-            if (isOwner)
+            get { return includeAccessLogging; }
+            set
             {
-                // SendCustomNetworkEvent(VRC.Udon.Common.Interfaces.NetworkEventTarget.Owner, nameof(RequestOwnerSync));
-                isOwner = false;
+                includeAccessLogging = value;
+                _RefreshDebugFlags();
             }
-
-            string name = Utilities.IsValid(player) ? player.displayName : "";
-            _AccessDebugLowLevel($"Ownserhip transferred to {name}");
-
-            if (Networking.IsOwner(gameObject))
-                isOwner = true;
         }
 
+        protected override void _RefreshDebugFlags()
+        {
+            base._RefreshDebugFlags();
+
+            hasAccessControl = accessControl;
+            ae_bypassAccessCheck = !hasAccessControl;
+            ae_bypassOwnershipCheck = ae_bypassAccessCheck || !enforceOwnershipTransfer;
+
+            if (logProvider)
+                ae_logAccessChannel = logProvider._RegisterChannel(componentNamespace, componentName, "access");
+            else
+                ae_logAccessChannel = -1;
+
+            ae_useAccessDebug = logProvider && includeAccessLogging;
+        }
+
+        public override bool OnOwnershipRequest(VRCPlayerApi requestingPlayer, VRCPlayerApi requestedOwner)
+        {
+            if (ae_bypassOwnershipCheck)
+                return true;
+
+            bool requesteeCheck = _AccessCheck(requestedOwner);
+
+            if (ae_useAccessDebug) logProvider._WriteInfo(ae_logAccessChannel, $"Ownership check: requestee={requesteeCheck}");
+
+            return requesteeCheck;
+        }
+
+        public override void OnOwnershipTransferred(VRCPlayerApi player)
+        {
+            if (ae_useAccessDebug)
+                logProvider._WriteInfo(ae_logAccessChannel, $"Ownership transferred to {_AE_PlayerNameId(player)}");
+
+            _OnOwnerChanged();
+
+            if (reclaimOwnership && !ae_bypassAccessCheck && !_OwnerHasAccess())
+                _AE_ScheduleReclaim();
+        }
+
+        private string _AE_PlayerNameId(VRCPlayerApi player)
+        {
+            if (!Utilities.IsValid(player))
+                return "--";
+
+            return player.displayName + ":" + player.playerId;
+        }
+
+        protected virtual void _OnOwnerChanged() { }
+
+        private void _AE_ScheduleReclaim()
+        {
+            if (ae_reclaimQueued)
+                return;
+            if (!_AccessCheck())
+                return;
+            if (!_AE_IsLowestAuthorizedPlayer())
+                return;
+
+            ae_reclaimQueued = true;
+            SendCustomEventDelayedSeconds(nameof(_InternalReclaimOwnership), 0.5f);
+        }
+
+        [NetworkCallable]
         public void RequestOwnerSync()
         {
-            _AccessDebugLog("RequestOwnerSync");
+            if (ae_useAccessDebug) logProvider._WriteInfo(ae_logAccessChannel, "RequestOwnerSync");
+
             if (Networking.IsOwner(gameObject))
                 RequestSerialization();
         }
 
-        protected virtual bool _AccessCheck()
+        public void _InternalReclaimOwnership()
         {
-            return !accessControl || accessControl._LocalHasAccess();
+            ae_reclaimQueued = false;
+
+            if (!reclaimOwnership || ae_bypassAccessCheck)
+                return;
+            if (Networking.IsOwner(gameObject))
+                return;
+            if (_OwnerHasAccess())
+                return;
+            if (!_AccessCheck() || !_AE_IsLowestAuthorizedPlayer())
+                return;
+
+            if (ae_useAccessDebug)
+            {
+                VRCPlayerApi player = Networking.GetOwner(gameObject);
+                logProvider._WriteInfo(ae_logAccessChannel, $"Reclaiming ownership from {_AE_PlayerNameId(player)}");
+            }
+
+            Networking.SetOwner(Networking.LocalPlayer, gameObject);
+            RequestSerialization();
         }
 
-        protected virtual bool _AccessCheck(VRCPlayerApi player)
+        private bool _AE_IsLowestAuthorizedPlayer()
         {
-            return !accessControl || accessControl._HasAccess(player);
-        }
-
-        protected bool _AccessOwnershipCheck()
-        {
-            if (!_AccessCheck())
+            VRCPlayerApi local = Networking.LocalPlayer;
+            if (!Utilities.IsValid(local))
                 return false;
 
-            if (!Networking.IsOwner(gameObject))
+            int count = VRCPlayerApi.GetPlayerCount();
+            if (ae_playerScratch == null || ae_playerScratch.Length < count)
+                ae_playerScratch = new VRCPlayerApi[count];
+
+            VRCPlayerApi.GetPlayers(ae_playerScratch);
+
+            int localId = local.playerId;
+            for (int i = 0; i < count; i++)
             {
-                Networking.SetOwner(Networking.LocalPlayer, gameObject);
-                _AccessOwnershipChange();
+                VRCPlayerApi p = ae_playerScratch[i];
+                if (!Utilities.IsValid(p) || p.playerId >= localId)
+                    continue;
+                if (accessControl._HasAccess(p))
+                    return false;
             }
 
             return true;
         }
 
-        protected virtual void _AccessOwnershipChange() { }
-
-        void _AccessDebugLog(string message)
+        protected bool _OwnerHasAccess()
         {
-            if (accessDebugLog)
-                accessDebugLog._Write(componentName, message);
+            return _AccessCheck(Networking.GetOwner(gameObject));
         }
 
-        void _AccessDebugLowLevel(string message)
+        public override void OnDeserialization(DeserializationResult result)
         {
-            if (accessDebugLog && accessDebugLowLevel)
-                accessDebugLog._Write(componentName, message);
+            base.OnDeserialization(result);
+
+            if (!syncGateEnabled || ae_bypassAccessCheck || _OwnerHasAccess())
+            {
+                _CaptureSyncShadow();
+                ae_shadowValid = true;
+                _OnSyncApplied(result);
+
+                return;
+            }
+
+            _RestoreSyncShadow();
+
+            if (ae_shadowValid)
+                _OnSyncReverted(result);
+            else
+                _OnSyncBlocked(result);
+        }
+
+        public override void OnPostSerialization(SerializationResult result)
+        {
+            if (!result.success)
+            {
+                if (ae_useAccessDebug) logProvider._WriteWarning(ae_logAccessChannel, "Failed to sync");
+                return;
+            }
+        }
+
+        protected virtual void _CaptureSyncShadow() { }
+
+        protected virtual void _RestoreSyncShadow() { }
+
+        protected virtual void _OnSyncApplied(DeserializationResult result) { }
+
+        protected virtual void _OnSyncReverted(DeserializationResult result) { }
+
+        protected virtual void _OnSyncBlocked(DeserializationResult result) { }
+
+        protected virtual void _CaptureRequestSerialization()
+        {
+            _CaptureSyncShadow();
+            RequestSerialization();
+        }
+
+
+        protected virtual bool _AccessCheck()
+        {
+            if (ae_bypassAccessCheck)
+                return true;
+
+            return accessControl._LocalHasAccess();
+        }
+
+        protected virtual bool _AccessCheck(VRCPlayerApi player)
+        {
+            if (ae_bypassAccessCheck)
+                return true;
+
+            return accessControl._HasAccess(player);
+        }
+
+        protected bool _AccessOwnershipCheck()
+        {
+            if (_AccessCheck())
+            {
+                if (!Networking.IsOwner(gameObject))
+                {
+                    Networking.SetOwner(Networking.LocalPlayer, gameObject);
+                    _AccessOwnershipChange();
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        protected virtual void _AccessOwnershipChange() { }
+
+        public AccessControl AccessControl
+        {
+            get { return accessControl; }
         }
     }
 }
