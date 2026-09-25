@@ -1,5 +1,11 @@
 {
   "dependencies": {
+    "com.spout2vrc": {
+      "version": "file:com.spout2vrc",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.texelsaur.common": {
       "version": "file:com.texelsaur.common",
       "depth": 0,
