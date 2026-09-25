@@ -6,7 +6,9 @@
     "unity": "2022.3",
     "dependencies": {},
     "gitDependencies": {},
-    "vpmDependencies": {},
+    "vpmDependencies": {
+        "jp.keijiro.klak.spout": "2.0.6"
+    },
     "author": {
         "name": "u-Kotovsky",
         "email": "",
