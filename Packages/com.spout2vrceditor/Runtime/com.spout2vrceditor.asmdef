@@ -1,5 +1,5 @@
 {
-    "name": "com.spout2vrc",
+    "name": "com.spout2vrceditor",
     "rootNamespace": "",
     "references": [
         "VRC.SDK3",
@@ -8,7 +8,8 @@
         "UdonSharp.Runtime",
         "com.texelsaur.common",
         "AudioLink",
-        "VRC.Udon.Serialization.OdinSerializer"
+        "VRC.Udon.Serialization.OdinSerializer",
+        "Klak.Spout.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "com.spout2vrc": {
-      "version": "file:com.spout2vrc",
+    "com.spout2vrceditor": {
+      "version": "file:com.spout2vrceditor",
       "depth": 0,
       "source": "embedded",
       "dependencies": {}

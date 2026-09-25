@@ -1,7 +1,7 @@
 {
-    "name": "com.spout2vrc",
-    "displayName": "Spout2VRC",
-    "version": "0.0.1",
+    "name": "com.spout2vrceditor",
+    "displayName": "Spout2VRCEditor",
+    "version": "0.0.2",
     "description": "A toolset that lets you quickly test RenderTextures in playmode through Spout2 texture sharing",
     "unity": "2022.3",
     "dependencies": {},
