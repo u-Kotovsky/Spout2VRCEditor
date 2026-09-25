@@ -31,8 +31,9 @@ This is mostly for Render Textures, if you update your screens via material upda
 1. In Unity Editor, go to your toolbar > Tools > Spout2VRCEditor
    - It's a configuration window with minor controls
    - From there you can choose what Spout2 texture your Render Textures will receive.
-2. Enter playmode
-3. See the result
+2. Choose your Render Texture and Spout2 Texture. You can add multiple RTs.
+3. Enter playmode
+4. See the result
 
 ## LICENSES
 
