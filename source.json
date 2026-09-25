@@ -1,0 +1,12 @@
+{
+    "name":"Spout2VRC",
+    "id":"com.spout2vrc",
+    "url":"https://u-kotovsky.github.io/Spout2VRCEditor/index.json",
+    "description":"",
+    "githubRepos": [
+        "u-Kotovsky/Spout2VRCEditor"
+    ],
+    "author": {
+        "name": "u-Kotovsky"
+    }
+}
