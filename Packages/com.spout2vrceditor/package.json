@@ -1,17 +1,16 @@
 {
-    "name": "com.spout2vrceditor",
-    "displayName": "Spout2VRCEditor",
-    "version": "0.0.2",
-    "description": "A toolset that lets you quickly test RenderTextures in playmode through Spout2 texture sharing",
-    "unity": "2022.3",
-    "dependencies": {},
-    "gitDependencies": {},
-    "vpmDependencies": {
-        "jp.keijiro.klak.spout": "2.0.6"
-    },
-    "author": {
-        "name": "u-Kotovsky",
-        "email": "",
-        "url": "https://github.com/u-Kotovsky"
-    }
+  "name": "com.spout2vrceditor",
+  "displayName": "Spout2VRCEditor",
+  "version": "1.0.3",
+  "description": "A toolset that lets you quickly test RenderTextures in playmode through Spout2 texture sharing",
+  "unity": "2022.3",
+  "gitDependencies": {},
+  "vpmDependencies": {
+    "jp.keijiro.klak.spout": "2.0.6"
+  },
+  "author": {
+    "name": "u-Kotovsky",
+    "email": "",
+    "url": "https://github.com/u-Kotovsky"
+  }
 }

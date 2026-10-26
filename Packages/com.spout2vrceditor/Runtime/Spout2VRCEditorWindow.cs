@@ -90,7 +90,7 @@ namespace Spout2VRCEditor
         private void EnsureSpoutReceiversCreated()
         {
             // Get all spout receivers
-            if (_spoutReceivers == null)
+            if (_spoutReceivers == null || _spoutReceivers.Length <= 0)
                 _spoutReceivers = FindObjectsOfType<SpoutReceiver>();
         }
     
